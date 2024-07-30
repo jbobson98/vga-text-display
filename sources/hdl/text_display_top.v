@@ -132,18 +132,34 @@ always @(*) begin
     end
 end
 
+// Handle memory delays
+reg [15:0] pix_x_delayed_1, pix_x_delayed_2, pix_y_delayed_1, pix_y_delayed_2;
+always @(posedge clk_75mhz, posedge rst_sync) begin
+    if(rst_sync) begin
+        pix_x_delayed_1 <= 0;
+        pix_y_delayed_1 <= 0;
+        pix_x_delayed_2 <= 0;
+        pix_y_delayed_2 <= 0;
+    end else begin
+        pix_x_delayed_1 <= vga_x_coord;
+        pix_y_delayed_1 <= vga_y_coord;
+        pix_x_delayed_2 <= pix_x_delayed_1;
+        pix_y_delayed_2 <= pix_y_delayed_1;
+    end
+end
 
 // Handle Ram Adressing
 assign tile_bram_addr_b = pixel_tile_addr;
 assign ascii_bram_addr = {tile_bram_data_out_b, vga_y_coord[3:0]};
+
 always @(posedge clk_75mhz) begin
     if(on_cursor) begin
-        vga_color_in <= 12'b111111111111;
+        vga_color_in <= 12'b000011110000;
     end else begin
-        if(ascii_bram_row_out[vga_x_coord[2:0]]) begin
-            vga_color_in <= 12'b111111111111;
+        if(ascii_bram_row_out[~pix_x_delayed_2[2:0]]) begin
+            vga_color_in <= 12'b000011110000;
         end else begin
-            vga_color_in <= 12'b000000001111;
+            vga_color_in <= 12'b000000000000;
         end
     end
 end
@@ -151,9 +167,7 @@ end
 // Handle Writing values
 assign tile_bram_we = center_sync;
 assign tile_bram_addr_a = cursor_tile_addr;
-assign tile_bram_data_in_a = 8'h41;
-
-
+assign tile_bram_data_in_a = 8'h43;
 
 
 endmodule
