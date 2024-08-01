@@ -6,6 +6,9 @@ module text_display_top (
     input wire left_in,
     input wire right_in,
     input wire center_in,
+    input wire keyboard_en,
+    input wire ps2_clk,
+    input wire ps2_data,
     output wire vga_hsync_o,
     output wire vga_vsync_o,
     output wire [11:0] vga_color_o // [4'bRED, 4'bGREEN, 4'bBLUE] 
@@ -23,7 +26,7 @@ clk_generator clocks (
 );
 
 /* Debounce and synchronize buttons */
-wire rst_sync, up_sync, down_sync, left_sync, right_sync, center_sync;
+wire rst_sync, up_sync, down_sync, left_sync, right_sync, center_sync, keyboard_en_sync;
 debouncer #(.CLK_FREQ(75_000_000)) reset_debouncer 
     (.clk(clk_75mhz), .rst(1'b0), .btn_in(rst_in), .btn_out(rst_sync));
 debouncer #(.CLK_FREQ(75_000_000)) up_debouncer 
@@ -36,6 +39,8 @@ debouncer #(.CLK_FREQ(75_000_000)) right_debouncer
     (.clk(clk_75mhz), .rst(1'b0), .btn_in(right_in), .btn_out(right_sync));
 debouncer #(.CLK_FREQ(75_000_000)) center_debouncer 
     (.clk(clk_75mhz), .rst(1'b0), .btn_in(center_in), .btn_out(center_sync));
+debouncer #(.CLK_FREQ(75_000_000)) keyboard_en_debouncer 
+    (.clk(clk_75mhz), .rst(1'b0), .btn_in(keyboard_en), .btn_out(keyboard_en_sync));
 
 /* Instantiate VGA core (1280x720 @60Hz) */
 reg [11:0] vga_color_in;
@@ -49,6 +54,18 @@ vga_core vga (
     .color_o(vga_color_o),
     .x_coord(vga_x_coord),
     .y_coord(vga_y_coord)
+);
+
+/* Instantiate PS2 Receiver */
+wire ps2_rx_done;
+wire [7:0] ps2_rx_data;
+ps2_scanner PS2Recv (
+    .clk(clk_75mhz),
+    .rst(rst_sync),
+    .ps2_clk(ps2_clk),
+    .ps2_data(ps2_data),
+    .rx_done(ps2_rx_done),
+    .rx_data_o(ps2_rx_data)
 );
 
 /* Instantiate ASCII BRAM (8x16 pixels) */
@@ -68,9 +85,10 @@ localparam integer TILE_HEIGHT = 16;
 localparam integer NUM_TILES = (DISP_WIDTH*DISP_HEIGHT) / (TILE_WIDTH*TILE_HEIGHT);
 localparam integer ASCII_BITS = 8;
 localparam integer TILE_ADDR_WIDTH = $clog2(NUM_TILES + 1) + 1;
-wire tile_bram_we;
+reg tile_bram_we;
 wire [TILE_ADDR_WIDTH-1 : 0] tile_bram_addr_a, tile_bram_addr_b;
-wire [ASCII_BITS-1 : 0] tile_bram_data_in_a, tile_bram_data_out_a, tile_bram_data_out_b;
+wire [ASCII_BITS-1 : 0] tile_bram_data_out_a, tile_bram_data_out_b;
+reg [ASCII_BITS-1 : 0] tile_bram_data_in_a;
 display_tile_bram #(
     .DATA_WIDTH(ASCII_BITS),
     .ADDR_WIDTH(TILE_ADDR_WIDTH)
@@ -101,22 +119,53 @@ posedge_detector edgeLEFT (.clk(clk_75mhz), .signal(left_sync), .edge_pulse(left
 posedge_detector edgeRIGHT (.clk(clk_75mhz), .signal(right_sync), .edge_pulse(right_pulse));
 posedge_detector edgeCENTER (.clk(clk_75mhz), .signal(center_sync), .edge_pulse(center_pulse));
 
+// PS2 Ignore Key Release
+reg ps2_ignore_next;
+always @(posedge clk_75mhz, posedge rst_sync) begin
+    if(rst_sync) begin
+        ps2_ignore_next <= 0;
+    end else begin
+        if(ps2_rx_done) begin
+            if(ps2_rx_data == 8'hF0) begin
+                ps2_ignore_next <= 1;
+            end else begin
+                ps2_ignore_next <= 0;
+            end
+        end
+    end
+end
+
 // Handle cursor position update
 always @(posedge clk_75mhz, posedge rst_sync) begin
     if(rst_sync) begin
         cursor_x <= 0;
         cursor_y <= 0;
     end else begin
-        case({up_pulse, down_pulse, left_pulse, right_pulse, center_pulse})
-            5'b10000: if(cursor_y >= TILE_HEIGHT)
-                        cursor_y <= cursor_y - TILE_HEIGHT;
-            5'b01000: if(cursor_y <= (DISP_HEIGHT-1) - TILE_HEIGHT)
-                        cursor_y <= cursor_y + TILE_HEIGHT;
-            5'b00100: if(cursor_x >= TILE_WIDTH)
-                        cursor_x <= cursor_x - TILE_WIDTH;
-            5'b00010: if(cursor_x <= (DISP_WIDTH-1) - TILE_WIDTH)
-                        cursor_x <= cursor_x + TILE_WIDTH;
-        endcase
+        if(keyboard_en_sync) begin
+            if(ps2_rx_done && !ps2_ignore_next) begin
+                case(ps2_rx_data)
+                    8'h75: if(cursor_y >= TILE_HEIGHT)
+                            cursor_y <= cursor_y - TILE_HEIGHT;
+                    8'h72: if(cursor_y <= (DISP_HEIGHT-1) - TILE_HEIGHT)
+                            cursor_y <= cursor_y + TILE_HEIGHT;
+                    8'h6B: if(cursor_x >= TILE_WIDTH)
+                            cursor_x <= cursor_x - TILE_WIDTH;
+                    8'h74: if(cursor_x <= (DISP_WIDTH-1) - TILE_WIDTH)
+                            cursor_x <= cursor_x + TILE_WIDTH;
+                endcase
+            end
+        end else begin
+            case({up_pulse, down_pulse, left_pulse, right_pulse, center_pulse})
+                5'b10000: if(cursor_y >= TILE_HEIGHT)
+                            cursor_y <= cursor_y - TILE_HEIGHT;
+                5'b01000: if(cursor_y <= (DISP_HEIGHT-1) - TILE_HEIGHT)
+                            cursor_y <= cursor_y + TILE_HEIGHT;
+                5'b00100: if(cursor_x >= TILE_WIDTH)
+                            cursor_x <= cursor_x - TILE_WIDTH;
+                5'b00010: if(cursor_x <= (DISP_WIDTH-1) - TILE_WIDTH)
+                            cursor_x <= cursor_x + TILE_WIDTH;
+            endcase
+        end
     end
 end
 
@@ -165,9 +214,40 @@ always @(posedge clk_75mhz) begin
 end
 
 // Handle Writing values
-assign tile_bram_we = center_sync;
+always @(*) begin
+    if(keyboard_en_sync) begin
+        if(ps2_rx_done & !ps2_ignore_next) begin
+            case(ps2_rx_data)
+                8'h1C: begin // A
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h41;
+                       end
+                8'h32: begin // B
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h42;
+                       end
+                8'h21: begin // C
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h43;
+                       end
+                default: begin 
+                            tile_bram_we = 0;
+                            tile_bram_data_in_a = 8'h00;
+                         end
+            endcase
+        end else begin
+            tile_bram_we = 0;
+            tile_bram_data_in_a = 8'h00;
+        end
+    end else begin
+        tile_bram_we = center_sync;
+        tile_bram_data_in_a = 8'h41;
+    end
+end
+
+
 assign tile_bram_addr_a = cursor_tile_addr;
-assign tile_bram_data_in_a = 8'h43;
+
 
 
 endmodule

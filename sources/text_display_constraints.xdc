@@ -26,7 +26,7 @@ set_property -dict { PACKAGE_PIN W5   IOSTANDARD LVCMOS33 } [get_ports clk_in]
 #set_property -dict { PACKAGE_PIN R3    IOSTANDARD LVCMOS33 } [get_ports {green_switches[3]}]
 #set_property -dict { PACKAGE_PIN W2    IOSTANDARD LVCMOS33 } [get_ports {red_switches[0]}]
 #set_property -dict { PACKAGE_PIN U1    IOSTANDARD LVCMOS33 } [get_ports {red_switches[1]}]
-#set_property -dict { PACKAGE_PIN T1    IOSTANDARD LVCMOS33 } [get_ports {red_switches[2]}]
+set_property -dict { PACKAGE_PIN T1    IOSTANDARD LVCMOS33 } [get_ports keyboard_en]
 set_property -dict { PACKAGE_PIN R2    IOSTANDARD LVCMOS33 } [get_ports rst_in]
 
 
@@ -138,8 +138,8 @@ set_property -dict { PACKAGE_PIN R19   IOSTANDARD LVCMOS33 } [get_ports vga_vsyn
 
 
 ##USB HID (PS/2)
-#set_property -dict { PACKAGE_PIN C17   IOSTANDARD LVCMOS33   PULLUP true } [get_ports PS2Clk]
-#set_property -dict { PACKAGE_PIN B17   IOSTANDARD LVCMOS33   PULLUP true } [get_ports PS2Data]
+set_property -dict { PACKAGE_PIN C17   IOSTANDARD LVCMOS33   PULLUP true } [get_ports ps2_clk]
+set_property -dict { PACKAGE_PIN B17   IOSTANDARD LVCMOS33   PULLUP true } [get_ports ps2_data]
 
 
 ##Quad SPI Flash
