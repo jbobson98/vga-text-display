@@ -144,14 +144,24 @@ always @(posedge clk_75mhz, posedge rst_sync) begin
         if(keyboard_en_sync) begin
             if(ps2_rx_done && !ps2_ignore_next) begin
                 case(ps2_rx_data)
-                    8'h75: if(cursor_y >= TILE_HEIGHT)
+                    8'h75: if(cursor_y >= TILE_HEIGHT) // up arrow
                             cursor_y <= cursor_y - TILE_HEIGHT;
-                    8'h72: if(cursor_y <= (DISP_HEIGHT-1) - TILE_HEIGHT)
+                    8'h72: if(cursor_y <= (DISP_HEIGHT-1) - TILE_HEIGHT) // down arrow
                             cursor_y <= cursor_y + TILE_HEIGHT;
-                    8'h6B: if(cursor_x >= TILE_WIDTH)
+                    8'h6B: if(cursor_x >= TILE_WIDTH) // left arrow
                             cursor_x <= cursor_x - TILE_WIDTH;
-                    8'h74: if(cursor_x <= (DISP_WIDTH-1) - TILE_WIDTH)
+                    8'h74,8'h29,8'h1C,8'h32,8'h21,8'h23,
+                    8'h24,8'h2b,8'h34,8'h33,8'h43,8'h3b,
+                    8'h42,8'h4b,8'h3a,8'h31,8'h44,8'h4d,
+                    8'h15,8'h2d,8'h1b,8'h2c,8'h3c,8'h2a,
+                    8'h1d,8'h22,8'h35,8'h1a: 
+                        if(cursor_x <= (DISP_WIDTH-1) - TILE_WIDTH) // right arrow
                             cursor_x <= cursor_x + TILE_WIDTH;
+                    8'h5a: begin // enter pressed
+                                cursor_x <= 0;
+                                if(cursor_y <= (DISP_HEIGHT-1) - TILE_HEIGHT)
+                                    cursor_y <= cursor_y + TILE_HEIGHT;
+                            end
                 endcase
             end
         end else begin
@@ -214,10 +224,15 @@ always @(posedge clk_75mhz) begin
 end
 
 // Handle Writing values
+assign tile_bram_addr_a = cursor_tile_addr;
 always @(*) begin
     if(keyboard_en_sync) begin
         if(ps2_rx_done & !ps2_ignore_next) begin
             case(ps2_rx_data)
+                8'h29: begin // space
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h00;
+                       end            
                 8'h1C: begin // A
                             tile_bram_we = 1;
                             tile_bram_data_in_a = 8'h41;
@@ -229,6 +244,98 @@ always @(*) begin
                 8'h21: begin // C
                             tile_bram_we = 1;
                             tile_bram_data_in_a = 8'h43;
+                       end
+                8'h23: begin // D
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h44;
+                       end
+                8'h24: begin // E
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h45;
+                       end
+                8'h2b: begin // F
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h46;
+                       end
+                8'h34: begin // G
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h47;
+                       end
+                8'h33: begin // H
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h48;
+                       end
+                8'h43: begin // I
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h49;
+                       end
+                8'h3b: begin // J
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h4a;
+                       end
+                8'h42: begin // K
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h4b;
+                       end
+                8'h4b: begin // L
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h4c;
+                       end
+                8'h3a: begin // M
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h4d;
+                       end
+                8'h31: begin // N
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h4e;
+                       end
+                8'h44: begin // O
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h4f;
+                       end
+                8'h4d: begin // P
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h50;
+                       end
+                8'h15: begin // Q
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h51;
+                       end
+                8'h2d: begin // R
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h52;
+                       end
+                8'h1b: begin // S
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h53;
+                       end
+                8'h2c: begin // T
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h54;
+                       end
+                8'h3c: begin // U
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h55;
+                       end
+                8'h2a: begin // V
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h56;
+                       end
+                8'h1d: begin // W
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h57;
+                       end
+                8'h22: begin // X
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h58;
+                       end
+                8'h35: begin // Y
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h59;
+                       end
+                8'h1a: begin // Z
+                            tile_bram_we = 1;
+                            tile_bram_data_in_a = 8'h5a;
                        end
                 default: begin 
                             tile_bram_we = 0;
@@ -244,10 +351,6 @@ always @(*) begin
         tile_bram_data_in_a = 8'h41;
     end
 end
-
-
-assign tile_bram_addr_a = cursor_tile_addr;
-
 
 
 endmodule
